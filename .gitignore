@@ -1,0 +1,26 @@
+# Python 虚拟环境
+.venv/
+venv/
+ENV/
+env/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# VS Code IntelliSense 数据库（体积巨大，不要提交）
+.vscode/browse.vc.db*
+.vscode/*.db
+.vscode/*.db-*
+
+# 注意：保留所有 .pdf 文件（课程材料）
+# 注意：保留 .vscode/ 中的配置文件（settings.json, c_cpp_properties.json）
