@@ -78,23 +78,34 @@ plt.show()
 
 * **问题**：证明为什么负梯度方向是损失函数下降的方向？
 * **解答**：
-**1. 泰勒展开推导** 设损失函数为 $f(\mathbf{x})$，当变量有一个微小增量  时，根据**一阶泰勒展开**，函数值的变化量  可以近似表示为：
+**1. 基于一阶泰勒展开的线性近似**
+
+  假设损失函数 $f(\mathbf{x})$ 在点 $\mathbf{x}$ 处连续可微。当自变量有一个微小增量 $\Delta \mathbf{x}$ 时，根据一阶泰勒展开，函数值的变化量 $\Delta f$ 可以近似表示为：$$\Delta f = f(\mathbf{x} + \Delta \mathbf{x}) - f(\mathbf{x}) \approx \nabla f(\mathbf{x})^T \Delta \mathbf{x}$$
+  
+  其中 $\nabla f(\mathbf{x})$ 是函数在点 $\mathbf{x}$ 处的梯度向量。为了使函数值下降，我们需要确保 $\Delta f < 0$，即：
+  
+  $$\nabla f(\mathbf{x})^T \Delta \mathbf{x} < 0$$
+  
+**2. 向量点积与几何分析**
+
+根据向量点积的定义，上述公式可以写成：
+
+$$\Delta f \approx \|\nabla f(\mathbf{x})\| \cdot \|\Delta \mathbf{x}\| \cdot \cos(\theta)$$
+
+其中 $\theta$ 是梯度向量 $\nabla f(\mathbf{x})$ 与增量方向 $\Delta \mathbf{x}$ 之间的夹角。
+
+为了研究函数值如何变化，我们固定增量的步长（即 $\|\Delta \mathbf{x}\|$ 为常数），分析夹角 $\theta$ 对 $\Delta f$ 的影响：
 
 
+* **下降条件**： 只要 $\cos(\theta) < 0$，即 $\theta \in (\frac{\pi}{2}, \frac{3\pi}{2})$，函数值就会下降。
 
-为了使函数值下降，必须保证 ，即：
+* **下降最快（最速下降）**： 当 $\cos(\theta)$ 取最小值时，$\Delta f$ 取得最小（负值绝对值最大）。
+  * 当 $\cos(\theta) = -1$ 时，$\Delta f$ 达到最小。
+  * 此时 $\theta = \pi$，即 $\Delta \mathbf{x}$ 的方向与梯度方向 $\nabla f(\mathbf{x})$ 完全相反。
 
+**3. 结论与工程实现**
 
-**2. 向量点积分析** 根据向量点积公式，上述条件可以改写为：
-
-
-
-其中  是梯度向量  与增量向量  之间的夹角：
-* **下降条件**：只要 （即夹角大于 ），函数值就会下降。
-* **最快下降**：当  时，，此时  与梯度方向**完全相反**。
-
-
-**3. 结论** 为了让损失函数  下降得最快，增量  应当取负梯度方向。因此，参数更新步长可以表示为 ，其中  为学习率。
+为了让损失函数 $f(\mathbf{x})$ 以最快的速度下降，增量 $\Delta \mathbf{x}$ 应当取负梯度方向。因此，在机器学习的参数更新中，我们定义更新步长为：$$\Delta \mathbf{x} = -\eta \nabla f(\mathbf{x})$$其中 $\eta > 0$ 被称为学习率 (Learning Rate)。更新后的参数为：$$\mathbf{x}_{new} = \mathbf{x}_{old} - \eta \nabla f(\mathbf{x}_{old})$$
 
 ---
 
@@ -274,3 +285,86 @@ print("XOR 预测结果:\n", output)
 
 * **Q3: 降低复杂度的措施**
 * 不使用全连接网络，改用**卷积神经网络 (CNN)**，利用**局部连接**和**权值共享**来大幅减少参数量。
+
+---
+
+# 第四部分：MNIST编程作业解答
+
+**(基于 homework_review.pdf 和 mnist_fcnn_exercise.ipynb)**
+
+### 1. 作业要求
+
+* **任务1**：补全全连接神经网络代码中的6处缺失部分。
+* **任务2**：使用sklearn评估模型性能。
+
+### 2. 代码补全解答
+
+**2.1 Sigmoid函数及其导数**
+
+```python
+def sigmoid(z):
+    """Sigmoid激活函数: σ(z) = 1/(1+e^(-z))"""
+    return 1.0 / (1.0 + np.exp(-z))
+
+def sigmoid_prime(z):
+    """Sigmoid导数: σ'(z) = σ(z) * (1-σ(z))"""
+    return sigmoid(z) * (1.0 - sigmoid(z))
+```
+
+**2.2 网络初始化 (__init__)**
+
+```python
+# 偏置向量: 对每个隐藏层和输出层生成随机偏置
+self._biases = [np.random.randn(y, 1) for y in sizes[1:]]
+
+# 权重矩阵: 连接相邻两层
+self._weights = [np.random.randn(y, x)
+                 for x, y in zip(sizes[:-1], sizes[1:])]
+```
+
+**2.3 前向传播 (feedforward)**
+
+```python
+for w, b in zip(self._weights, self._biases):
+    a = sigmoid(np.dot(w, a) + b)
+```
+
+**2.4 调用反向传播 (update_mini_batch)**
+
+```python
+# 对每个样本计算梯度
+delta_nabla_b, delta_nabla_w = self.backprop(x, y)
+```
+
+**2.5 隐藏层误差计算 (backprop)**
+
+```python
+# 误差反向传播: δ^(l) = ((W^(l+1))^T * δ^(l+1)) ⊙ σ'(z^(l))
+delta = np.dot(self._weights[-l+1].transpose(), delta) * sp
+```
+
+### 3. 完整代码
+
+完整实现见 `mnist_fcnn_solution.py`。
+
+### 4. 性能评估
+
+使用sklearn的classification_report:
+
+```python
+from sklearn.metrics import classification_report
+
+# 获取预测结果
+predictions = [np.argmax(fc.feedforward(x)) for x, _ in test_data]
+labels = [y for _, y in test_data]
+
+# 生成分类报告
+print(classification_report(labels, predictions))
+```
+
+### 5. 关键点总结
+
+* **权重初始化**：使用标准正态分布，避免对称性问题。
+* **矩阵维度**：W^(l) 的维度是 (当前层, 前一层)。
+* **误差传播**：从输出层向输入层逐层计算 δ。
+* **梯度累加**：mini-batch中所有样本的梯度需要累加后再更新。
