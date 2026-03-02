@@ -202,7 +202,7 @@ class Conv(object):
         ## 补全代码 ##
         k_180 = self.k
         k_180 = k_180[::-1,::-1]
-        k_180_col = k_180.reshape(-1, nk)
+        k_180_col = k_180.reshape(-1, ck)
 
         if hd - hk + 1 != hx:
             pad = (hx - hd + hk - 1) // 2
