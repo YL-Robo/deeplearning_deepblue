@@ -72,7 +72,7 @@ class Softmax(object):
         return self.softmax
 
 
-dataset_path = "./dataset/mnist"
+dataset_path = "2_convolutional_neural_network/coding_examples/dataset/mnist"
 train_data = torchvision.datasets.MNIST(
             root=dataset_path,  # 参数1：数据存储路径
             train=True,         # 参数2：指定加载训练集/测试集(True:加载训练集 False:加载测试集)
@@ -88,28 +88,48 @@ train_data.targets = onehot(train_data.targets, 60000)  # 标签one-hot处理 (6
 class Linear(object):
 
     def __init__(self, inChannel, outChannel):
+        # 计算权重初始化的缩放因子（解决梯度消失/爆炸问题）
+        # Kaiming 正态分布初始化，它能让权重的方差变为 $\frac{2}{fan_{in}}$，完美适配 ReLU 激活函数
         scale = np.sqrt(inChannel / 2)
+
+        # 步骤2：初始化权重矩阵 W
+        # np.random.standard_normal：生成标准正态分布（均值0，方差1）的随机数
+        # 形状：(inChannel, outChannel) → 输入维度×输出维度
+        # 除以scale：对随机数缩放，让初始化的权重值更合理
         self.W = np.random.standard_normal((inChannel, outChannel)) / scale
+        
+        # 步骤3：初始化偏置向量 b
+        # 形状：(outChannel,) → 输出维度的一维向量
+        # 同样除以scale缩放，和权重初始化保持一致
         self.b = np.random.standard_normal(outChannel) / scale
+        
+        # 步骤4：初始化权重的梯度矩阵（全0），用于反向传播存储梯度
         self.W_gradient = np.zeros((inChannel, outChannel))
+        
+        # 步骤5：初始化偏置的梯度向量（全0），用于反向传播存储梯度
         self.b_gradient = np.zeros(outChannel)
 
     def forward(self, x):
         """前向过程"""
         ## 补全代码 ##
+        self.x = x
+        x_forward = np.dot(self.x, self.W) + self.b
+        return x_forward
+        
+        
 
     def backward(self, delta, learning_rate):
         """反向过程"""
         ## 梯度计算
         batch_size = self.x.shape[0]
-
+        
         ## 补全代码 ##
-        self.W_gradient =
-        self.b_gradient =
-        delta_backward =
+        self.W_gradient = np.dot(self.x.T, delta) / batch_size
+        self.b_gradient = np.sum(delta, axis=0) / batch_size
+        delta_backward = np.dot(delta, self.W.T)
         ## 反向传播
-        self.W -=
-        self.b -=
+        self.W -= self.W_gradient * learning_rate
+        self.b -= self.b_gradient * learning_rate
 
         return delta_backward
 
@@ -118,10 +138,16 @@ class Linear(object):
 class Conv(object):
     def __init__(self, kernel_shape, step=1, pad=0):
         # [w, h, d]
+        # 5, 5, 1, 6
         width, height, in_channel, out_channel = kernel_shape
         self.step = step
         self.pad = pad
-        scale = np.sqrt(3 * in_channel * width * height / out_channel)
+
+        # 参数初始化方差不合理 -》 梯度消失 / 爆炸，因此需要"方差缩放"
+        # 为了让正态分布的方差完全等价于 PyTorch 默认均匀分布的方差
+        # scale = np.sqrt(3 * in_channel * width * height / out_channel)
+        scale = np.sqrt(3 * in_channel * width * height)
+        
         self.k = np.random.standard_normal(kernel_shape) / scale
         self.b = np.random.standard_normal(out_channel) / scale
         self.k_gradient = np.zeros(kernel_shape)
@@ -131,6 +157,10 @@ class Conv(object):
         self.x = x
         if self.pad != 0:
             self.x = np.pad(self.x, ((0, 0), (self.pad, self.pad), (self.pad, self.pad), (0, 0)), 'constant')
+        # bx：一批多少张图
+        # wx, hx：图大小
+        # cx：输入通道（RGB=3）
+        # nk：输出通道（用多少个卷积核）
         bx, wx, hx, cx = self.x.shape
         # kernel的宽、高、通道数、个数
         wk, hk, ck, nk = self.k.shape
@@ -139,38 +169,40 @@ class Conv(object):
 
         self.image_col = []
         # kernal也进行了reshape，便于卷积加速，只保留通道维度，是个二维的矩阵
+        # -1是自动算行数
         kernel = self.k.reshape(-1, nk)
-
+        
         ## 补全代码 ##
         for i in range(bx):
-            image_col =
-            feature[i] =
-            self.image_col.append()
+            image_col = img2col(self.x[i], wk, self.step)
+            feature[i] = (np.dot(image_col, kernel) + self.b).reshape(feature_w, feature_w, nk)
+            self.image_col.append(image_col)
         return feature
 
     def backward(self, delta, learning_rate):
         bx, wx, hx, cx = self.x.shape  # batch,14,14,inchannel
         wk, hk, ck, nk = self.k.shape  # 5,5,inChannel,outChannel
-        bd, wd, hd, cd = delta.shape  # batch,10,10,outChannel
+        bd, wd, hd, cd = delta.shape   # batch,10,10,outChannel
 
         # 计算self.k_gradient,self.b_gradient
         # 参数更新过程
         ## 补全代码 ##
         delta_col = delta.reshape(bd, -1, cd)
         for i in range(bx):
-            self.k_gradient +=
-        self.k_gradient /=
-        self.b_gradient +=
-        self.b_gradient /=
+            self.k_gradient += np.dot(self.image_col[i].T, delta_col[i]).reshape(self.k.shape)
+        self.k_gradient /= bx
+        # 把 batch 和 所有位置 的误差全部加在一起，每个通道只保留一个总和
+        self.b_gradient += np.sum(delta_col, axis=(0, 1))
+        self.b_gradient /= bx
 
         # 计算delta_backward
         # 误差的反向传递
         delta_backward = np.zeros(self.x.shape)
         # numpy矩阵（对应kernal）旋转180度
         ## 补全代码 ##
-        k_180 =
-        k_180 =
-        k_180_col =
+        k_180 = self.k
+        k_180 = k_180[::-1,::-1]
+        k_180_col = k_180.reshape(-1, nk)
 
         if hd - hk + 1 != hx:
             pad = (hx - hd + hk - 1) // 2
@@ -201,7 +233,7 @@ class Pool(object):
                 for i in range(feature_w):
                     for j in range(feature_w):
                         ## 补全代码
-                        feature[bi, i, j, ci] =
+                        feature[bi, i, j, ci] = np.max(x[bi, i * 2:i * 2 + 2, j * 2:j * 2 + 2, ci])
                         index = np.argmax(x[bi, i * 2:i * 2 + 2, j * 2:j * 2 + 2, ci])
                         self.feature_mask[bi, i * 2 + index // 2, j * 2 + index % 2, ci] = 1
         return feature
@@ -212,7 +244,7 @@ class Pool(object):
 
 def train(batch=32, lr=0.01, epochs=10):
     # Mnist手写数字集
-    dataset_path = "./dataset/mnist"
+    dataset_path = "2_convolutional_neural_network/coding_examples/dataset/mnist"
     train_data = torchvision.datasets.MNIST(root=dataset_path, train=True, download=False)
     train_data.data = train_data.data.numpy()  # [60000,28,28]
     train_data.targets = train_data.targets.numpy()  # [60000]
@@ -274,7 +306,7 @@ def train(batch=32, lr=0.01, epochs=10):
 def eval():
     model = np.load("simple_cnn_model.npz")
 
-    dataset_path = "./dataset/mnist"
+    dataset_path = "2_convolutional_neural_network/coding_examples/dataset/mnist"
     test_data = torchvision.datasets.MNIST(root=dataset_path, train=False)
     test_data.data = test_data.data.numpy()  # [10000,28,28]
     test_data.targets = test_data.targets.numpy()  # [10000]
